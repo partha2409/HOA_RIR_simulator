@@ -1,5 +1,5 @@
 Currently supports:
- - Shoebox rooms
+ - Shoebox rooms - fs 24k
  - various material types for walls, floors, ceiling
  - HOA microphone (random placement, 0.5m away from any wall)
  - 64 stationary sources - first 32 omni, next 16 cardioid, last 16 randomly sucardioid and hypercardioid. Directional sources - some face mic, some away from mic.

@@ -1,3 +1,5 @@
+Bare minimum implementation of HOA RIR simulator
+
 Currently supports:
  - Shoebox rooms - fs 24k
  - various material types for walls, floors, ceiling

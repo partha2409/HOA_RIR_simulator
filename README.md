@@ -10,6 +10,13 @@ Currently supports:
 
  Metadata stores all these information like source postions, directivity, orientation, distance to microphone, room dims, wall types and so on.
 
+Requirements:
+python 3.9 or above
+numpy
+matplotlib
+plotly
+spaduiopy
+pyroomacoustics
 
 To run:
 

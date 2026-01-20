@@ -7,3 +7,8 @@ Currently supports:
  - moving trajectories - 2,3,4,5m trajectories depnding on room size. 26 point RIR in each trajectory. Moving cardioid sources orientation is in the direction of  motion.
 
  Metadata stores all these information like source postions, directivity, orientation, distance to microphone, room dims, wall types and so on.
+
+
+To run:
+
+python simulate_rirs.py --args

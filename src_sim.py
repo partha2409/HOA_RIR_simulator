@@ -434,15 +434,18 @@ def sample_stationary_sources_in_room(room, num_stationary_sources=64, margin=0.
     return room, metadata
 
 
-def sample_sources_in_room(room, num_stationary_sources=64, num_moving_sources=3, margin=0.5, min_distance_to_mic=0.3, apply_directivity=True):
 
-    room, stationary_metadata = sample_stationary_sources_in_room(room, num_stationary_sources, margin, min_distance_to_mic=min_distance_to_mic, apply_directivity=apply_directivity)
-    room, moving_metadata = sample_moving_sources_in_room(room, num_moving_sources, margin, min_distance_to_mic=min_distance_to_mic, apply_directivity=apply_directivity)
+def sample_sources_in_room(room, num_stationary_sources=64, num_moving_sources=3, margin=0.5, min_distance_to_mic=0.3, apply_directivity=False):
 
-    sources_metadata = {
-        "stationary": stationary_metadata,
-        "moving": moving_metadata
-    }
+    sources_metadata = {}
+
+    if num_stationary_sources > 0:
+        room, stationary_metadata = sample_stationary_sources_in_room(room, num_stationary_sources, margin, min_distance_to_mic=min_distance_to_mic, apply_directivity=apply_directivity)
+        sources_metadata["stationary"] = stationary_metadata
+    if num_moving_sources > 0:
+        room, moving_metadata = sample_moving_sources_in_room(room, num_moving_sources, margin, min_distance_to_mic=min_distance_to_mic, apply_directivity=apply_directivity)
+        sources_metadata["moving"] = moving_metadata
+
 
     return room, sources_metadata
     

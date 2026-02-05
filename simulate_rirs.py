@@ -21,22 +21,8 @@ import time
 import concurrent.futures 
 
 
-def calculate_rt60(room):    
-    """
-    Calculate the RT60 of a given room both using the Sabine formula and ism.
-    """
-
-    # simulated with ism
-    room.measure_rt60()
-    rt60_sim = np.round(np.mean(room.measure_rt60()),3)
-
-    # theoretical with sabine
-    rt60_sabine = np.round(room.rt60_theory(formula="sabine"), 3)
-
-    return rt60_sabine, rt60_sim
-
-
-def simulate_single_room(min_dim, max_dim, hoa_lookup, hoa_order=3, n_stationary_src_per_room=64, n_moving_src_per_room=3, fs=16000, max_order=3, rir_dir="rirs", room_idx=0, visualize=False, apply_directivity=False):
+def simulate_single_room(min_dim, max_dim, hoa_lookup, hoa_order=3, n_stationary_src_per_room=64, n_moving_src_per_room=3, fs=16000,
+                         early_fraction=0.7, max_order=30, min_order=10, rir_dir="rirs", room_idx=0, visualize=False, apply_directivity=False):
     """
     Simulate a single room, place HOA mic, sample sources, compute RIRs, and save RIR + metadata.
     Args:
@@ -48,7 +34,9 @@ def simulate_single_room(min_dim, max_dim, hoa_lookup, hoa_order=3, n_stationary
         n_stationary_src_per_room (int): Number of stationary sources per room
         n_moving_src_per_room (int): Number of moving sources per room
         fs (int): Sampling rate
+        early_fraction (float): Fraction of RT60 to consider as early reflections
         max_order (int): Max reflection order
+        min_order (int): Minimum reflection order for ISM to ensure some reverberation even in very dry rooms
         rir_dir (str): Directory to save RIRs
         room_idx (int): Room index for saving
         visualize (bool): Whether to visualize the room interactively
@@ -62,7 +50,7 @@ def simulate_single_room(min_dim, max_dim, hoa_lookup, hoa_order=3, n_stationary
 
     metadata = {}
     # --- Create random room ---
-    room, room_metadata = create_random_shoebox_room(fs, max_order, np.array(min_dim), np.array(max_dim), materials_dict, room_idx)
+    room, room_metadata = create_random_shoebox_room(fs, np.array(min_dim), np.array(max_dim), materials_dict, room_idx, early_fraction=early_fraction, max_order=max_order, min_order=min_order)
     metadata["room"] = room_metadata
 
     # --- Place HOA mic ---
@@ -75,10 +63,6 @@ def simulate_single_room(min_dim, max_dim, hoa_lookup, hoa_order=3, n_stationary
 
     # --- Compute RIRs for all sources and mic---
     room.compute_rir()
-    
-    rt60_sabine, rt60_simulated = calculate_rt60(room)
-    metadata["room"]["rt60_sabine"] = rt60_sabine
-    metadata["room"]["rt60_simulated"] = rt60_simulated
 
     # --- Pack RIRs into (n_src, n_mics, max_len) array ---
     M = int(room.mic_array.M) if hasattr(room, "mic_array") else 1
@@ -88,10 +72,11 @@ def simulate_single_room(min_dim, max_dim, hoa_lookup, hoa_order=3, n_stationary
     for m in range(M):
         for s in range(n_src):
             max_len = max(max_len, len(room.rir[m][s]))
-
+            
     rirs_np = np.zeros((n_src, M, max_len), dtype=float)
-    for s in range(n_src):
-        for m in range(M):
+    
+    for m in range(M):
+        for s in range(n_src):
             ir = room.rir[m][s]
             rirs_np[s, m, :len(ir)] = ir
 
@@ -114,7 +99,8 @@ def simulate_single_room(min_dim, max_dim, hoa_lookup, hoa_order=3, n_stationary
     return elapsed_time
     
 
-def simulate_rooms(n_rooms, min_dim, max_dim, sphere_points_path, hoa_order=3, n_stationary_src_per_room=64, n_moving_src_per_room=3, fs=16000, max_order=3, rir_dir="rirs", apply_directivity=False, visualize=False):
+def simulate_rooms(n_rooms, min_dim, max_dim, sphere_points_path, hoa_order=3, n_stationary_src_per_room=64, n_moving_src_per_room=3, fs=16000, 
+                   early_fraction=0.7, max_order=30, min_order=10, rir_dir="rirs", apply_directivity=False, visualize=False):
 
     """
     Simulate multiple rooms, place HOA mic, sample sources, compute RIRs, and save RIR + metadata.
@@ -129,7 +115,9 @@ def simulate_rooms(n_rooms, min_dim, max_dim, sphere_points_path, hoa_order=3, n
         n_stationary_src_per_room (int): Number of stationary sources per room
         n_moving_src_per_room (int): Number of moving sources per room
         fs (int): Sampling rate
-        max_order (int): Max reflection order
+        early_fraction (float): Fraction of RT60 to consider as early reflections
+        max_order (int): Maximum reflection order for ISM in case RT60 estimation gives very high order
+        min_order (int): Minimum reflection order for ISM to ensure some reverberation even in very dry rooms
         rir_dir (str): Directory to save RIRs
         apply_directivity (bool): Whether to apply directivity to sources
         visualize (bool): Whether to visualize the room and sources
@@ -141,13 +129,13 @@ def simulate_rooms(n_rooms, min_dim, max_dim, sphere_points_path, hoa_order=3, n
     # --- Step 1: Generate HOA lookup ---
     print(f"Generating HOA lookup for order {hoa_order} ...")
     hoa_lookup = generate_hoa_lookup(order=hoa_order, sphere_points_path=sphere_points_path)
-    
+    print(f"Completed HOA lookup generation")
     
     # --- Step 2: Simulate rooms in parallel ---
     start_time_overall = time.time()
     with concurrent.futures.ProcessPoolExecutor() as executor:
         results = [executor.submit(simulate_single_room, min_dim, max_dim, hoa_lookup, hoa_order, n_stationary_src_per_room, n_moving_src_per_room, fs,
-                                   max_order, rir_dir,  room_idx, apply_directivity=apply_directivity, visualize=visualize) for room_idx in range(n_rooms)]
+                                   early_fraction, max_order, min_order, rir_dir,  room_idx, apply_directivity=apply_directivity, visualize=visualize) for room_idx in range(n_rooms)]
 
         for room_idx, f in enumerate(concurrent.futures.as_completed(results)):
             elapsed_time = f.result()
@@ -173,7 +161,9 @@ if __name__ == "__main__":
     parser.add_argument("--n_stationary_src_per_room", type=int, default=64)
     parser.add_argument("--n_moving_src_per_room", type=int, default=6)
     parser.add_argument("--fs", type=int, default=24000)
-    parser.add_argument("--max_order", type=int, default=20)
+    parser.add_argument("--early_fraction", type=float, default=0.7, help="Fraction of RT60 to consider as early reflections")
+    parser.add_argument("--max_order", type=int, default=30, help="Maximum reflection order for ISM in case RT60 estimation gives very high order")
+    parser.add_argument("--min_order", type=float, default=10, help="Minimum reflection order for ISM to ensure some reverberation even in very dry rooms")
     parser.add_argument("--rir_dir", type=str, default="/media/partha/LaCie/simulated_rirs_test")
     parser.add_argument("--apply_directivity", action="store_true", help="Whether to apply directivity to sources")
     parser.add_argument("--visualize", action="store_true", help="Whether to visualize the room and sources")
@@ -190,7 +180,9 @@ if __name__ == "__main__":
         n_stationary_src_per_room=args.n_stationary_src_per_room,
         n_moving_src_per_room=args.n_moving_src_per_room,
         fs=args.fs,
+        early_fraction=args.early_fraction,
         max_order=args.max_order,
+        min_order=args.min_order,
         rir_dir=args.rir_dir,
         apply_directivity=args.apply_directivity,
         visualize=args.visualize

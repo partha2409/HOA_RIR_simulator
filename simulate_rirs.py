@@ -72,7 +72,7 @@ def simulate_single_room(min_dim, max_dim, hoa_lookup, hoa_order=3, n_stationary
     for m in range(M):
         for s in range(n_src):
             max_len = max(max_len, len(room.rir[m][s]))
-            
+
     rirs_np = np.zeros((n_src, M, max_len), dtype=float)
     
     for m in range(M):
@@ -128,7 +128,7 @@ def simulate_rooms(n_rooms, min_dim, max_dim, sphere_points_path, hoa_order=3, n
 
     # --- Step 1: Generate HOA lookup ---
     print(f"Generating HOA lookup for order {hoa_order} ...")
-    hoa_lookup = generate_hoa_lookup(order=hoa_order, sphere_points_path=sphere_points_path)
+    hoa_lookup = generate_hoa_lookup(order=hoa_order, sphere_points_path=sphere_points_path, visualize=visualize)
     print(f"Completed HOA lookup generation")
     
     # --- Step 2: Simulate rooms in parallel ---
